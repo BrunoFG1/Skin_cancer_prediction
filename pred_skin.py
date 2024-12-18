@@ -9,6 +9,8 @@ from pathlib import Path
 from torchvision import transforms
 import albumentations as A
 from albumentations.pytorch import ToTensorV2
+import matplotlib.pyplot as plt 
+import numpy as np
 
 IMAGENET_DEFAULT_MEAN = [0.485, 0.456, 0.406]
 IMAGENET_DEFAULT_STD = [0.229, 0.224, 0.225]
@@ -35,6 +37,7 @@ train_transforms = A.Compose(
                 ToTensorV2(),
             ]
         )
+
 eval_transforms = A.Compose(
             [
                 A.Resize(width=img_size, height=img_size),
@@ -64,8 +67,6 @@ class PH2Dataset(Dataset):
         self.img_dir = img_dir
         self.transform = transform
 
-    
-
 
     def __len__(self):
         return len(self.data)
@@ -75,18 +76,16 @@ class PH2Dataset(Dataset):
         img_name = self.data.iloc[index, 0]  
         label = self.data.iloc[index, 1]    
         
-        
-        img_path = os.path.join(self.img_dir, img_name)
-        image = Image.open(img_path)
+        img_path = os.path.join(self.img_dir, img_name + ".jpg")
+        image = Image.open(img_path).convert("RGB")
+
 
         if self.transform:
-            image = self.transform(image)
-
+            aug = self.transform(image=np.array(image))
+            image = aug['image']
         
         return image, label 
     
-
-
 
 for fold in range(5):
     train_csv = os.path.join(main_dir, f'train_fold_{fold + 1}.csv')
@@ -104,8 +103,18 @@ for fold in range(5):
                                   batch_size=16,
                                   shuffle=False,
                                   num_workers=os.cpu_count())
-     
+    
+    for batch in train_dataloader:
+        images, labels = batch
 
+        images = images.permute(0, 2, 3, 1).cpu().numpy()
 
+        fig, axs = plt.subplots(4, 4, figsize=(12, 12)) 
+        axs = axs.flatten()
 
+        for img, label, ax in zip(images, labels, axs):
+            ax.imshow(img)
+            ax.set_title(f"Label: {label}")
+            ax.axis('off')
 
+        plt.show()
