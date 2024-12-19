@@ -1,5 +1,6 @@
 import torch
 import torchvision
+from torch import nn
 import os
 import pandas as pd
 from sklearn.model_selection import StratifiedKFold
@@ -11,10 +12,14 @@ import albumentations as A
 from albumentations.pytorch import ToTensorV2
 import matplotlib.pyplot as plt 
 import numpy as np
+import timm
+from going_modular.going_modular import engine
 
 IMAGENET_DEFAULT_MEAN = [0.485, 0.456, 0.406]
 IMAGENET_DEFAULT_STD = [0.229, 0.224, 0.225]
 img_size = 224
+
+device = "cuda" if torch.cuda.is_available() else "cpu"
 
 images_path = Path('PH2/images') # resolver esta merda
 
@@ -117,4 +122,23 @@ for fold in range(5):
             ax.set_title(f"Label: {label}")
             ax.axis('off')
 
-        plt.show()
+        
+        #plt.show()
+
+
+# Create model
+model = timm.create_model('resnet50', pretrained=True, num_classes = 2)
+
+loss_fn = nn.CrossEntropyLoss()
+
+optimizer = torch.optim.Adam(params=model.parameters(), lr=0.001)
+
+
+model_results = engine.train(model=model,
+                             train_dataloader=train_dataloader,
+                             test_dataloader=test_dataloader,
+                             optimizer=optimizer,
+                             loss_fn=loss_fn,
+                             epochs=10,
+                             device=device)
+
