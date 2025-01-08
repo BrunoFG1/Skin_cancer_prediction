@@ -14,6 +14,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import timm
 from going_modular.going_modular import engine
+from helper_functions import plot_loss_curves
 
 IMAGENET_DEFAULT_MEAN = [0.485, 0.456, 0.406]
 IMAGENET_DEFAULT_STD = [0.229, 0.224, 0.225]
@@ -109,7 +110,7 @@ for fold in range(5):
                                   shuffle=False,
                                   num_workers=os.cpu_count())
     
-    for batch in train_dataloader:
+    '''for batch in train_dataloader:
         images, labels = batch
 
         images = images.permute(0, 2, 3, 1).cpu().numpy()
@@ -123,8 +124,7 @@ for fold in range(5):
             ax.axis('off')
 
         
-        #plt.show()
-
+        plt.show()'''
 
 # Create model
 model = timm.create_model('resnet50', pretrained=True, num_classes = 2)
@@ -133,12 +133,19 @@ loss_fn = nn.CrossEntropyLoss()
 
 optimizer = torch.optim.Adam(params=model.parameters(), lr=0.001)
 
+scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer=optimizer,
+                                                       mode='min',
+                                                       factor=0.1)
+
 
 model_results = engine.train(model=model,
                              train_dataloader=train_dataloader,
                              test_dataloader=test_dataloader,
                              optimizer=optimizer,
                              loss_fn=loss_fn,
-                             epochs=10,
-                             device=device)
+                             epochs=20,
+                             device=device,
+                             scheduler=scheduler)
 
+
+plot_loss_curves(model_results)

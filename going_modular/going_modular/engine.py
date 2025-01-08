@@ -5,6 +5,7 @@ import torch
 
 from tqdm.auto import tqdm
 from typing import Dict, List, Tuple
+import numpy as np
 
 def train_step(model: torch.nn.Module, 
                dataloader: torch.utils.data.DataLoader, 
@@ -122,7 +123,8 @@ def train(model: torch.nn.Module,
           optimizer: torch.optim.Optimizer,
           loss_fn: torch.nn.Module,
           epochs: int,
-          device: torch.device) -> Dict[str, List]:
+          device: torch.device,
+          scheduler) -> Dict[str, List]:
     """Trains and tests a PyTorch model.
 
     Passes a target PyTorch models through train_step() and test_step()
@@ -164,6 +166,8 @@ def train(model: torch.nn.Module,
     # Make sure model on target device
     model.to(device)
 
+    best_loss = np.inf
+
     # Loop through training and testing steps for a number of epochs
     for epoch in tqdm(range(epochs)):
         train_loss, train_acc = train_step(model=model,
@@ -191,5 +195,12 @@ def train(model: torch.nn.Module,
         results["test_loss"].append(test_loss)
         results["test_acc"].append(test_acc)
 
+        if scheduler:
+            scheduler.step(test_loss)
+
+        if best_loss > test_loss:
+            best_loss = test_loss
+            print(f"\nValidation loss improved from {best_loss} to {test_loss}") 
+            
     # Return the filled results at the end of the epochs
     return results
