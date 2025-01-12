@@ -201,6 +201,8 @@ def train(model: torch.nn.Module,
         if best_loss > test_loss:
             best_loss = test_loss
             print(f"\nValidation loss improved from {best_loss} to {test_loss}") 
+        
+        
             
     # Return the filled results at the end of the epochs
     return results

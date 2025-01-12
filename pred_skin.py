@@ -93,6 +93,8 @@ class PH2Dataset(Dataset):
         return image, label 
     
 
+fold_Accuracy = []
+
 for fold in range(5):
     train_csv = os.path.join(main_dir, f'train_fold_{fold + 1}.csv')
     test_csv = os.path.join(main_dir, f'val_fold_{fold + 1}.csv')
@@ -126,26 +128,34 @@ for fold in range(5):
         
         plt.show()'''
 
-# Create model
-model = timm.create_model('resnet50', pretrained=True, num_classes = 2)
+    # Create model
+    model = timm.create_model('resnet50', pretrained=True, num_classes = 2)
 
-loss_fn = nn.CrossEntropyLoss()
+    loss_fn = nn.CrossEntropyLoss()
 
-optimizer = torch.optim.Adam(params=model.parameters(), lr=0.001)
+    optimizer = torch.optim.Adam(params=model.parameters(), lr=0.001)
 
-scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer=optimizer,
-                                                       mode='min',
-                                                       factor=0.1)
-
-
-model_results = engine.train(model=model,
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer=optimizer,
+                                                        mode='min',
+                                                        factor=0.1)
+    
+    model_results = engine.train(model=model,
                              train_dataloader=train_dataloader,
                              test_dataloader=test_dataloader,
                              optimizer=optimizer,
                              loss_fn=loss_fn,
-                             epochs=20,
+                             epochs=100,
                              device=device,
                              scheduler=scheduler)
+    
+    accuracy = model_results["test_acc"][-1]
+    fold_Accuracy.append(accuracy)
 
+sum_num = 0
+for i in fold_Accuracy:
+    sum_num += i
 
-plot_loss_curves(model_results)
+average_acc = sum_num/len(fold_Accuracy)
+print(f"Average accuracy: {average_acc}")
+
+#plot_loss_curves(model_results)
