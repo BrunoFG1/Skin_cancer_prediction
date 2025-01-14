@@ -15,19 +15,22 @@ import numpy as np
 import timm
 from going_modular.going_modular import engine
 from helper_functions import plot_loss_curves
+import json
 
 IMAGENET_DEFAULT_MEAN = [0.485, 0.456, 0.406]
 IMAGENET_DEFAULT_STD = [0.229, 0.224, 0.225]
 img_size = 224
 
+torch.manual_seed(42)
+
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
 images_path = Path('PH2/images') # resolver esta merda
 
-data = pd.read_csv('PH2_dataset.csv')
+data = pd.read_csv('data/PH2_dataset.csv')
 
 skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
-main_dir = os.path.dirname('PH2_dataset.csv')
+main_dir = os.path.dirname('data/PH2_dataset.csv')
 
 
 train_transforms = A.Compose(
@@ -94,6 +97,7 @@ class PH2Dataset(Dataset):
     
 
 fold_Accuracy = []
+results = {}
 
 for fold in range(5):
     train_csv = os.path.join(main_dir, f'train_fold_{fold + 1}.csv')
@@ -130,6 +134,9 @@ for fold in range(5):
 
     # Create model
     model = timm.create_model('resnet50', pretrained=True, num_classes = 2)
+    #model = timm.create_model('densenet121', pretrained = True, num_classes=2)
+    #model = timm.create_model('resnet101', pretrained=True, num_classes =2)
+    #model = timm.create_model('vit_base_patch16_224', pretrained=True, num_classes =2)
 
     loss_fn = nn.CrossEntropyLoss()
 
@@ -149,13 +156,32 @@ for fold in range(5):
                              scheduler=scheduler)
     
     accuracy = model_results["test_acc"][-1]
+    print(f"{fold} acc is:  {accuracy}  ")
     fold_Accuracy.append(accuracy)
 
 sum_num = 0
 for i in fold_Accuracy:
     sum_num += i
 
-average_acc = sum_num/len(fold_Accuracy)
-print(f"Average accuracy: {average_acc}")
+# Carregar os resultados do arquivo
+with open("assets/model_results.json", "r") as f:
+    results = json.load(f)
 
-#plot_loss_curves(model_results)
+'''average_acc = sum_num/len(fold_Accuracy)
+results['resnet50'] = average_acc
+
+with open("model_results.json", "w") as f:
+    json.dump(results, f, indent=4)'''
+
+
+#print(f"Average accuracy: {average_acc}")
+# Convert the results dictionary to a DataFrame
+df = pd.DataFrame.from_dict(results, orient="index", columns=["Accuracy"])
+
+# Add a column for model names
+df.index.name = "Model"
+df.reset_index(inplace=True)
+
+# Print the table
+print(df)
+
