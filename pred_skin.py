@@ -13,9 +13,12 @@ from albumentations.pytorch import ToTensorV2
 import matplotlib.pyplot as plt 
 import numpy as np
 import timm
-from going_modular.going_modular import engine
+from going_modular.going_modular import engine, utils
 from helper_functions import plot_loss_curves
 import json
+from torchmetrics import ConfusionMatrix
+from mlxtend.plotting import plot_confusion_matrix
+from tqdm.auto import tqdm
 
 IMAGENET_DEFAULT_MEAN = [0.485, 0.456, 0.406]
 IMAGENET_DEFAULT_STD = [0.229, 0.224, 0.225]
@@ -146,7 +149,7 @@ for fold in range(5):
                                                         mode='min',
                                                         factor=0.1)
     
-    model_results = engine.train(model=model,
+    '''model_results = engine.train(model=model,
                              train_dataloader=train_dataloader,
                              test_dataloader=test_dataloader,
                              optimizer=optimizer,
@@ -157,7 +160,12 @@ for fold in range(5):
     
     accuracy = model_results["test_acc"][-1]
     print(f"{fold} acc is:  {accuracy}  ")
-    fold_Accuracy.append(accuracy)
+    fold_Accuracy.append(accuracy)'''
+
+'''utils.save_model(model=model,
+                 target_dir='models/',
+                 model_name='best_model.pth')'''
+
 
 sum_num = 0
 for i in fold_Accuracy:
@@ -183,5 +191,55 @@ df.index.name = "Model"
 df.reset_index(inplace=True)
 
 # Print the table
-print(df)
+#print(df)
+
+path_best_model = 'models/best_model.pth'
+
+loaded_model = model
+loaded_model.load_state_dict(torch.load(path_best_model))
+loaded_model.to(device)
+loaded_model.eval()
+
+y_preds = []
+y_true = []
+
+with torch.inference_mode():
+  for X, y in tqdm(test_dataloader, desc="Making predictions"):
+    
+    X, y = X.to(device), y.to(device)
+
+    y_logit = loaded_model(X)
+    # Turn predictions from logits -> prediction probabilities -> predictions labels
+    y_pred = torch.softmax(y_logit, dim=1).argmax(dim=1) 
+
+    y_true.append(y.cpu())
+    y_preds.append(y_pred.cpu())
+
+# Concatenate list of predictions into a tensor
+y_pred_tensor = torch.cat(y_preds)
+y_true_tensor = torch.cat(y_true)
+
+# Confusion Matrix
+confmat = ConfusionMatrix(task='binary', num_classes=2)
+conf_mtx = confmat(y_pred_tensor, y_true_tensor)
+
+# Plot the confusion matrix
+fig, ax = plot_confusion_matrix(
+    conf_mat=conf_mtx.numpy(),
+    class_names=['0', '1'],
+    figsize=(10, 7)
+)
+
+TN = conf_mtx[0,0]
+FN = conf_mtx[0,1]
+FP = conf_mtx[1,0]
+TP = conf_mtx[1,1]
+
+sensivity = TP/(TP + FN)
+specificity = TN/(TN + FP)
+
+print(f"Sensivity: {sensivity}")
+print(f"Specificity: {specificity}")
+
+
 
