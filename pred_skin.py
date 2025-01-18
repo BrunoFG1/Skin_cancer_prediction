@@ -136,10 +136,10 @@ for fold in range(5):
         plt.show()'''
 
     # Create model
+    model1 = timm.create_model('densenet121', pretrained = True, num_classes=2)
+    model2 = timm.create_model('resnet101', pretrained=True, num_classes =2)
+    model3 = timm.create_model('vit_base_patch16_224', pretrained=True, num_classes =2)
     model = timm.create_model('resnet50', pretrained=True, num_classes = 2)
-    #model = timm.create_model('densenet121', pretrained = True, num_classes=2)
-    #model = timm.create_model('resnet101', pretrained=True, num_classes =2)
-    #model = timm.create_model('vit_base_patch16_224', pretrained=True, num_classes =2)
 
     loss_fn = nn.CrossEntropyLoss()
 
@@ -160,12 +160,18 @@ for fold in range(5):
     
     accuracy = model_results["test_acc"][-1]
     print(f"{fold} acc is:  {accuracy}  ")
-    fold_Accuracy.append(accuracy)'''
+    fold_Accuracy.append(accuracy)
 
-'''utils.save_model(model=model,
+utils.save_model(model=model,
                  target_dir='models/',
-                 model_name='best_model.pth')'''
+                 model_name='vit_base_patch16_224.pth')'''
 
+models_info = {
+    "densenet121_model": model1,
+    "resnet101": model2,
+    "vit_base_patch16_224": model3,
+    "best_model": model
+}
 
 sum_num = 0
 for i in fold_Accuracy:
@@ -190,56 +196,68 @@ df = pd.DataFrame.from_dict(results, orient="index", columns=["Accuracy"])
 df.index.name = "Model"
 df.reset_index(inplace=True)
 
+sens_list = []
+spec_list = []
+ball_acc = []
+
+for model_name, model in models_info.items():
+    model_path = f'models/{model_name}.pth'  # Use the key (string) to create the path
+    loaded_model = model  # Assign the actual model object
+    loaded_model.load_state_dict(torch.load(model_path))  # Load the weights
+    loaded_model.to(device)
+    loaded_model.eval()
+
+    y_preds = []
+    y_true = []
+
+    with torch.inference_mode():
+        for X, y in tqdm(test_dataloader, desc="Making predictions"):
+        
+            X, y = X.to(device), y.to(device)
+
+            y_logit = loaded_model(X)
+            # Turn predictions from logits -> prediction probabilities -> predictions labels
+            y_pred = torch.softmax(y_logit, dim=1).argmax(dim=1) 
+
+            y_true.append(y.cpu())
+            y_preds.append(y_pred.cpu())
+
+    # Concatenate list of predictions into a tensor
+    y_pred_tensor = torch.cat(y_preds)
+    y_true_tensor = torch.cat(y_true)
+
+    # Confusion Matrix
+    confmat = ConfusionMatrix(task='binary', num_classes=2)
+    conf_mtx = confmat(y_pred_tensor, y_true_tensor)
+
+    # Plot the confusion matrix
+    fig, ax = plot_confusion_matrix(
+        conf_mat=conf_mtx.numpy(),
+        class_names=['0', '1'],
+        figsize=(10, 7)
+    )
+
+    TN = conf_mtx[0,0]
+    FN = conf_mtx[0,1]
+    FP = conf_mtx[1,0]
+    TP = conf_mtx[1,1]
+
+    sensivity = TP/(TP + FN)
+    specificity = TN/(TN + FP)
+    ballance_acc = (sensivity + specificity)/2
+    ball_acc.append(ballance_acc)
+
+    print(f"Sensivity: {sensivity}")
+    print(f"specificity: {specificity}")
+
+    sens_list.append(sensivity)
+    spec_list.append(specificity)
+
+# Add column in tabel to compare Sensivity and specificity
+df["Sensivity"] = sens_list
+df["Specificity"] = spec_list
+df["Balanced Accuracy"] = ball_acc
+
+
 # Print the table
-#print(df)
-
-path_best_model = 'models/best_model.pth'
-
-loaded_model = model
-loaded_model.load_state_dict(torch.load(path_best_model))
-loaded_model.to(device)
-loaded_model.eval()
-
-y_preds = []
-y_true = []
-
-with torch.inference_mode():
-  for X, y in tqdm(test_dataloader, desc="Making predictions"):
-    
-    X, y = X.to(device), y.to(device)
-
-    y_logit = loaded_model(X)
-    # Turn predictions from logits -> prediction probabilities -> predictions labels
-    y_pred = torch.softmax(y_logit, dim=1).argmax(dim=1) 
-
-    y_true.append(y.cpu())
-    y_preds.append(y_pred.cpu())
-
-# Concatenate list of predictions into a tensor
-y_pred_tensor = torch.cat(y_preds)
-y_true_tensor = torch.cat(y_true)
-
-# Confusion Matrix
-confmat = ConfusionMatrix(task='binary', num_classes=2)
-conf_mtx = confmat(y_pred_tensor, y_true_tensor)
-
-# Plot the confusion matrix
-fig, ax = plot_confusion_matrix(
-    conf_mat=conf_mtx.numpy(),
-    class_names=['0', '1'],
-    figsize=(10, 7)
-)
-
-TN = conf_mtx[0,0]
-FN = conf_mtx[0,1]
-FP = conf_mtx[1,0]
-TP = conf_mtx[1,1]
-
-sensivity = TP/(TP + FN)
-specificity = TN/(TN + FP)
-
-print(f"Sensivity: {sensivity}")
-print(f"Specificity: {specificity}")
-
-
-
+print(df)
