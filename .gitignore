@@ -1,2 +1,7 @@
 PH2/
 models
+PH2Dataset/
+compare.py
+converted_data.csv
+converttxt_csv.py
+PH2_dataset.txt
